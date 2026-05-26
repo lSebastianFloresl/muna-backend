@@ -1,17 +1,13 @@
-import { NestFactory } from '@nestjs/core'
-import { AppModule } from './app.module'
-
 async function bootstrap() {
+  console.log("STARTING APP")
+
   const app = await NestFactory.create(AppModule)
 
-  app.enableCors({
-    origin: [
-      "http://localhost:5173",
-      "https://muna-frontend.sebastian-flores301220.workers.dev",
-    ],
-  })
+  console.log("AFTER APP CREATE")
+
+  app.enableCors()
 
   await app.listen(process.env.PORT || 3000)
-}
 
-bootstrap()
+  console.log("SERVER STARTED")
+}
