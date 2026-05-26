@@ -1,0 +1,249 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model categories {
+  category_id    String     @id @db.Uuid
+  categoria_lvl1 String?    @db.VarChar(255)
+  categoria_lvl2 String?    @db.VarChar(255)
+  products       products[]
+
+  @@index([categoria_lvl1], map: "idx_categories_lvl1")
+  @@index([categoria_lvl2], map: "idx_categories_lvl2")
+}
+
+model price_history {
+  price_history_id String    @id @db.Uuid
+  product_id       String?   @db.Uuid
+  store_id         String?   @db.Uuid
+  precio_actual    Decimal?  @db.Decimal(10, 2)
+  precio_original  Decimal?  @db.Decimal(10, 2)
+  descuento_pct    Decimal?  @db.Decimal(5, 2)
+  fecha_scraping   DateTime? @db.Timestamp(6)
+  products         products? @relation(fields: [product_id], references: [product_id], onDelete: NoAction, onUpdate: NoAction)
+  stores           stores?   @relation(fields: [store_id], references: [store_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([fecha_scraping], map: "idx_price_history_fecha")
+  @@index([precio_actual], map: "idx_price_history_price")
+  @@index([product_id], map: "idx_price_history_product")
+  @@index([product_id, fecha_scraping(sort: Desc)], map: "idx_price_history_product_date")
+  @@index([fecha_scraping], map: "idx_price_history_scraping")
+  @@index([store_id], map: "idx_price_history_store")
+}
+
+model product_store {
+  product_store_id String    @id @db.Uuid
+  product_id       String?   @db.Uuid
+  store_id         String?   @db.Uuid
+  url              String?
+  active           Boolean?
+  imagen           String?
+  products         products? @relation(fields: [product_id], references: [product_id], onDelete: NoAction, onUpdate: NoAction)
+  stores           stores?   @relation(fields: [store_id], references: [store_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([active], map: "idx_product_store_active")
+  @@index([product_id], map: "idx_product_store_product")
+  @@index([store_id], map: "idx_product_store_store")
+}
+
+model products {
+  product_id                                                                       String                    @id @db.Uuid
+  sku                                                                              String?                   @db.VarChar(255)
+  nombre                                                                           String?
+  nombre_normalizado                                                               String?
+  product_fingerprint                                                              String?                   @unique(map: "idx_products_fingerprint") @db.VarChar(255)
+  marca                                                                            String?                   @db.VarChar(255)
+  ml                                                                               Float?
+  spf                                                                              Float?
+  category_id                                                                      String?                   @db.Uuid
+  favorites                                                                        favorites[]
+  price_alerts                                                                     price_alerts[]
+  price_history                                                                    price_history[]
+  product_current_snapshot                                                         product_current_snapshot?
+  product_metrics_daily                                                            product_metrics_daily[]
+  product_predictions                                                              product_predictions[]
+  product_recommendations_product_recommendations_recommended_product_idToproducts product_recommendations[] @relation("product_recommendations_recommended_product_idToproducts")
+  product_recommendations_product_recommendations_source_product_idToproducts      product_recommendations[] @relation("product_recommendations_source_product_idToproducts")
+  product_store                                                                    product_store[]
+  product_trends                                                                   product_trends[]
+  product_view_events                                                              product_view_events[]
+  categories                                                                       categories?               @relation(fields: [category_id], references: [category_id], onUpdate: NoAction, map: "fk_products_category")
+
+  @@index([category_id], map: "idx_products_category_id")
+  @@index([marca], map: "idx_products_marca")
+  @@index([nombre], map: "idx_products_nombre")
+  @@index([nombre_normalizado], map: "idx_products_nombre_normalizado")
+}
+
+model stores {
+  store_id                 String                     @id @db.Uuid
+  tienda                   String?                    @unique @db.VarChar(255)
+  price_history            price_history[]
+  product_current_snapshot product_current_snapshot[]
+  product_store            product_store[]
+  store_current_snapshot   store_current_snapshot?
+
+  @@index([tienda], map: "idx_stores_tienda")
+}
+
+model brand_current_snapshot {
+  brand_snapshot_id String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marca             String    @unique @db.VarChar(255)
+  total_products    Int?      @default(0)
+  avg_discount      Decimal?  @db.Decimal(5, 2)
+  avg_price         Decimal?  @db.Decimal(10, 2)
+  searches_7d       Int?      @default(0)
+  favorites_7d      Int?      @default(0)
+  trend_score       Float?
+  updated_at        DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model brand_metrics_daily {
+  brand_metric_id String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  marca           String   @db.VarChar(255)
+  metric_date     DateTime @db.Date
+  searches        Int?     @default(0)
+  views           Int?     @default(0)
+  favorites       Int?     @default(0)
+  avg_discount    Decimal? @db.Decimal(5, 2)
+  avg_price       Decimal? @db.Decimal(10, 2)
+
+  @@index([metric_date], map: "idx_brand_metrics_date")
+}
+
+model favorites {
+  favorite_id String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id  String    @db.Uuid
+  session_id  String?   @db.VarChar(255)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  products    products  @relation(fields: [product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_favorite_product")
+
+  @@index([product_id], map: "idx_favorites_product")
+}
+
+model price_alerts {
+  alert_id     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id   String    @db.Uuid
+  target_price Decimal   @db.Decimal(10, 2)
+  email        String?   @db.VarChar(255)
+  active       Boolean?  @default(true)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  products     products  @relation(fields: [product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_alert_product")
+}
+
+model product_current_snapshot {
+  snapshot_id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id           String    @unique @db.Uuid
+  current_price        Decimal?  @db.Decimal(10, 2)
+  original_price       Decimal?  @db.Decimal(10, 2)
+  current_discount_pct Decimal?  @db.Decimal(5, 2)
+  avg_price_7d         Decimal?  @db.Decimal(10, 2)
+  avg_price_30d        Decimal?  @db.Decimal(10, 2)
+  min_price_30d        Decimal?  @db.Decimal(10, 2)
+  max_price_30d        Decimal?  @db.Decimal(10, 2)
+  price_trend          String?   @db.VarChar(50)
+  volatility_score     Float?
+  cheapest_store_id    String?   @db.Uuid
+  popularity_score     Float?
+  views_7d             Int?      @default(0)
+  favorites_7d         Int?      @default(0)
+  updated_at           DateTime? @default(now()) @db.Timestamp(6)
+  products             products  @relation(fields: [product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_snapshot_product")
+  stores               stores?   @relation(fields: [cheapest_store_id], references: [store_id], onUpdate: NoAction, map: "fk_snapshot_store")
+
+  @@index([current_discount_pct], map: "idx_snapshot_discount")
+  @@index([popularity_score], map: "idx_snapshot_popularity")
+  @@index([current_price], map: "idx_snapshot_price")
+}
+
+model product_metrics_daily {
+  metric_id    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id   String   @db.Uuid
+  metric_date  DateTime @db.Date
+  views        Int?     @default(0)
+  searches     Int?     @default(0)
+  favorites    Int?     @default(0)
+  alerts       Int?     @default(0)
+  avg_price    Decimal? @db.Decimal(10, 2)
+  avg_discount Decimal? @db.Decimal(5, 2)
+  products     products @relation(fields: [product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_product_metric")
+
+  @@index([metric_date], map: "idx_product_metrics_date")
+}
+
+model product_predictions {
+  prediction_id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id          String    @db.Uuid
+  predicted_price_7d  Decimal?  @db.Decimal(10, 2)
+  predicted_price_30d Decimal?  @db.Decimal(10, 2)
+  confidence_score    Float?
+  generated_at        DateTime? @default(now()) @db.Timestamp(6)
+  products            products  @relation(fields: [product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_prediction_product")
+}
+
+model product_recommendations {
+  recommendation_id                                                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source_product_id                                                 String    @db.Uuid
+  recommended_product_id                                            String    @db.Uuid
+  similarity_score                                                  Float?
+  generated_at                                                      DateTime? @default(now()) @db.Timestamp(6)
+  products_product_recommendations_recommended_product_idToproducts products  @relation("product_recommendations_recommended_product_idToproducts", fields: [recommended_product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recommended_product")
+  products_product_recommendations_source_product_idToproducts      products  @relation("product_recommendations_source_product_idToproducts", fields: [source_product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_source_product")
+}
+
+model product_trends {
+  trend_id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id     String    @db.Uuid
+  trend_score    Float?
+  momentum_score Float?
+  anomaly_score  Float?
+  generated_at   DateTime? @default(now()) @db.Timestamp(6)
+  products       products  @relation(fields: [product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_trend_product")
+}
+
+model product_view_events {
+  product_view_event_id String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id            String    @db.Uuid
+  session_id            String?   @db.VarChar(255)
+  viewed_at             DateTime? @default(now()) @db.Timestamp(6)
+  products              products  @relation(fields: [product_id], references: [product_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_product_view_product")
+
+  @@index([product_id], map: "idx_product_views_product")
+}
+
+model search_events {
+  search_event_id String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  search_term     String    @db.VarChar(255)
+  results_count   Int?
+  session_id      String?   @db.VarChar(255)
+  brand_filter    String?   @db.VarChar(255)
+  category_filter String?   @db.VarChar(255)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([search_term], map: "idx_search_events_term")
+}
+
+model search_metrics_daily {
+  search_metric_id  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  search_term       String   @db.VarChar(255)
+  metric_date       DateTime @db.Date
+  searches          Int?     @default(0)
+  avg_results_count Int?
+
+  @@index([metric_date], map: "idx_search_metrics_date")
+}
+
+model store_current_snapshot {
+  store_snapshot_id String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  store_id          String    @unique @db.Uuid
+  avg_discount      Decimal?  @db.Decimal(5, 2)
+  avg_price         Decimal?  @db.Decimal(10, 2)
+  total_products    Int?      @default(0)
+  updated_at        DateTime? @default(now()) @db.Timestamp(6)
+  stores            stores    @relation(fields: [store_id], references: [store_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_store_snapshot")
+}
