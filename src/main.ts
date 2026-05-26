@@ -2,15 +2,16 @@ import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 
 async function bootstrap() {
-  console.log("1 START")
-
   const app = await NestFactory.create(AppModule)
 
-  console.log("2 AFTER CREATE")
+  app.enableCors({
+    origin: [
+      "http://localhost:5173",
+      "https://muna-frontend.sebastian-flores301220.workers.dev",
+    ],
+  })
 
   await app.listen(process.env.PORT || 3000)
-
-  console.log("3 AFTER LISTEN")
 }
 
 bootstrap()
